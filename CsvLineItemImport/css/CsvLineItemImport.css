@@ -1,0 +1,45 @@
+/* Minimal, neutral styling. No brand colors — only neutral grays so the control
+   blends into whatever theme the maker uses. The root fills the maker-allocated width. */
+
+.csv-import {
+    box-sizing: border-box;
+    width: 100%;
+    font-family: inherit;
+    font-size: 14px;
+    color: #323130;
+}
+
+.csv-import-btn {
+    font: inherit;
+    padding: 6px 16px;
+    border: 1px solid #8a8886;
+    border-radius: 2px;
+    background-color: #ffffff;
+    color: inherit;
+    cursor: pointer;
+}
+
+.csv-import-btn:hover {
+    background-color: #f3f2f1;
+}
+
+.csv-import-btn:active {
+    background-color: #edebe9;
+}
+
+.csv-import-btn:focus {
+    outline: 1px solid #605e5c;
+    outline-offset: 1px;
+}
+
+.csv-summary {
+    margin-top: 8px;
+    line-height: 1.5;
+    color: #605e5c;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.csv-summary--error {
+    color: #a4262c;
+}

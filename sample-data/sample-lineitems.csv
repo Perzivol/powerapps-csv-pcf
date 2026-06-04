@@ -1,0 +1,23 @@
+﻿product_code,product_description,unit_cost,quantity,coverage_start_date,coverage_end_date,total_cost,source_document,source_page
+GL-1001,"General Liability, Primary"," 18,801.22 ",1.00,3/7/2026,3/6/2027," 18,801.22 ",policy_2026.pdf,12
+PROP-2002,"Property - Building, Contents"," 9,500.00 ",2.00,3/7/2026,3/6/2027," 19,000.00 ",policy_2026.pdf,13
+AUTO-3003,Commercial Auto Fleet,750.00,8.00,4/1/2026,3/31/2027," 6,000.00 ",fleet_sched.pdf,4
+WC-4004,Workers Comp Class A," 12,250.75 ",1.00,1/1/2026,12/31/2026," 12,250.75 ",wc_policy.pdf,2
+UMB-5005,"Umbrella, Excess Layer"," 27,300.00 ",1.00,3/7/2026,3/6/2027," 27,300.00 ",umbrella.pdf,1
+CYB-6006,"Cyber, Data Breach Response"," 8,415.10 ",1.00,2/15/2026,2/14/2027," 8,415.10 ",cyber_quote.pdf,7
+ENV-7007,"Pollution ""Legal"" Liability"," 5,200.00 ",1.00,5/1/2026,," 5,200.00 ",env_policy.pdf,9
+DO-8008,"Directors and Officers, Side A"," 14,750.00 ",1.00,3/7/2026,3/6/2027," 14,750.00 ",do_policy.pdf,3
+EPL-9009,Employment Practices,3200.00,1.00,3/7/2026,3/6/2027,3200.00,epl.pdf,6
+CRG-1010,"Cargo, Inland Marine"," 2,150.50 ",4.00,6/1/2026,5/31/2027," 8,602.00 ",marine.pdf,5
+BOND-1111,Surety Bond,500.00,3.00,1/1/2026,12/31/2026," 1,500.00 ",bond.pdf,8
+MED-1212,"Medical Malpractice, Claims-Made"," 22,900.00 ",1.00,7/1/2026,6/30/2027," 22,900.00 ",med_mal.pdf,11
+EQ-1313,Equipment Breakdown,56.00,56.00,3/7/2026,3/6/2027," 3,136.00 ",eq_break.pdf,14
+TBD-1414,Pending Endorsement,TBD,1.00,3/7/2026,3/6/2027,0.00,endorse_draft.pdf,99
+FLD-1515,"Flood, Zone AE"," 4,875.25 ",1.00,3/7/2026,3/6/2027," 4,875.25 ",flood.pdf,10
+EQK-1616,Earthquake DIC," 6,300.00 ",1.00,3/7/2026,3/6/2027," 6,300.00 ",quake.pdf,15
+GL-1717,"General Liability, Excess"," 952,816.96 ",1.00,3/7/2026,3/6/2027," 952,816.96 ",master_policy.pdf,21
+TRV-1818,Business Travel Accident,1.00,250.00,,12/31/2026,250.00,travel.pdf,17
+KRP-1919,"Kidnap, Ransom and Extortion"," 7,650.00 ",1.00,3/7/2026,3/6/2027," 7,650.00 ",kr_policy.pdf,18
+PROF-2020,"Professional Liability, E and O"," 18,420.40 ",1.00,3/7/2026,3/6/2027," 18,420.40 ",eo_policy.pdf,19
+BOP-2121,Business Owners Package," 11,005.00 ",1.00,3/7/2026,3/6/2027," 11,005.00 ",bop.pdf,20
+GAP-2222,"Gap Coverage, Misc"," 1,234.56 ",1.00,8/1/2026,7/31/2027," 1,234.56 ",gap.pdf,22

@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest>
+  <control namespace="CsvTools"
+           constructor="CsvLineItemImport"
+           version="1.0.0"
+           display-name-key="CSV Line-Item Import"
+           description-key="Pick a local .csv, parse it client-side, and expose the rows to the canvas app as a typed table."
+           control-type="standard">
+
+    <!-- This control makes NO network/external calls (pure client-side FileReader parsing).
+         Declaring enabled="false" keeps it out of the premium/connector classification. -->
+    <external-service-usage enabled="false">
+    </external-service-usage>
+
+    <!-- ============================ INPUT ============================ -->
+    <property name="ButtonText"
+              display-name-key="Button Text"
+              description-key="Label shown on the import button."
+              of-type="SingleLine.Text"
+              usage="input"
+              required="false"
+              default-value="Import CSV" />
+
+    <!-- ===================== PRIMARY TYPED-TABLE OUTPUT ===================== -->
+    <!-- ParsedRows is an object-typed output. getOutputSchema() in index.ts returns a
+         top-level array schema, so canvas Power Fx sees this property directly as a
+         typed Table (no ParseJSON required). -->
+    <property name="ParsedRows"
+              display-name-key="Parsed Rows"
+              description-key="Parsed CSV rows exposed as a typed table."
+              of-type="Object"
+              usage="output"
+              hidden="false"
+              default-value="" />
+
+    <!-- Hidden companion property. Canvas uses this to retrieve the ParsedRows object
+         schema at design time; it is never set by the maker. -->
+    <property name="ParsedRowsSchema"
+              display-name-key="Parsed Rows Schema"
+              description-key="Internal schema descriptor for ParsedRows (canvas apps only)."
+              of-type="SingleLine.Text"
+              usage="input"
+              hidden="true" />
+
+    <!-- ===================== CONVENIENCE SCALAR OUTPUTS ===================== -->
+    <property name="RowCount"
+              display-name-key="Row Count"
+              description-key="Number of data rows parsed."
+              of-type="Whole.None"
+              usage="output" />
+
+    <property name="ErrorRowCount"
+              display-name-key="Error Row Count"
+              description-key="Number of rows that failed numeric parsing."
+              of-type="Whole.None"
+              usage="output" />
+
+    <property name="TotalCostSum"
+              display-name-key="Total Cost Sum"
+              description-key="Sum of the total_cost column across all parsed rows."
+              of-type="Decimal"
+              usage="output" />
+
+    <!-- ===================== DOCUMENTED FALLBACK OUTPUT ===================== -->
+    <!-- Always populated. Use only if a given environment cannot surface the object
+         output; bind via ParseJSON(...) as described in the README. -->
+    <property name="ParsedRowsJson"
+              display-name-key="Parsed Rows JSON"
+              description-key="JSON serialization of ParsedRows; fallback if the typed object output is unavailable."
+              of-type="SingleLine.Text"
+              usage="output" />
+
+    <!-- Links the hidden schema companion to the object output. -->
+    <property-dependencies>
+      <property-dependency input="ParsedRowsSchema" output="ParsedRows" required-for="schema" />
+    </property-dependencies>
+
+    <resources>
+      <code path="index.ts" order="1" />
+      <css path="css/CsvLineItemImport.css" order="1" />
+    </resources>
+  </control>
+</manifest>

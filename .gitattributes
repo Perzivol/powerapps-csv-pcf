@@ -1,0 +1,9 @@
+# Normalize line endings for text source files (stored as LF in the repo).
+* text=auto
+
+# The sample CSV is a test fixture that intentionally uses a UTF-8 BOM and CRLF
+# line endings. Treat it as binary so Git preserves its exact bytes on every platform.
+sample-data/sample-lineitems.csv -text
+
+# Solution packages are binary artifacts.
+*.zip binary
