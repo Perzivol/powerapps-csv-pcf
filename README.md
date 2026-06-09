@@ -2,17 +2,17 @@
 
 A standard (non-React) Power Apps Component Framework control for **canvas apps**. It renders an
 **Import CSV** button, lets the user pick a local `.csv`, parses it **entirely in the browser**
-(no network, no Power Automate, no Dataverse), shows an inline parse summary, and exposes the
-parsed rows back to the app as a **typed output table** (`ParsedRows`) that Power Fx can
-`ForAll`/`Collect` directly — **no `ParseJSON` required**.
+(no network, no Power Automate, no Dataverse), and exposes the parsed rows back to the app as a
+**typed output table** (`ParsedRows`) that Power Fx can `ForAll`/`Collect` directly — **no
+`ParseJSON` required**. Parse stats and error details are exposed as scalar outputs so the app
+can surface them with Power Fx (e.g. `Notify()` in `OnChange`).
 
 ---
 
 ## Assumptions (read me first)
 
-1. **Control model: standard (non-virtual), vanilla TypeScript + DOM.** The UI is one button, a
-   hidden `<input type="file">`, and a summary `div` — no React. Smallest possible bundle
-   (~18 KB), zero UI dependencies.
+1. **Control model: standard (non-virtual), vanilla TypeScript + DOM.** The UI is one button and a
+   hidden `<input type="file">` — no React. Smallest possible bundle (~18 KB), zero UI dependencies.
 2. **Typed-table output mechanism: an object-typed output property + `getOutputSchema()`.**
    `ParsedRows` is declared `of-type="Object"` with a hidden dependent `ParsedRowsSchema`
    property linked through `<property-dependencies … required-for="schema">`.
@@ -40,18 +40,16 @@ parsed rows back to the app as a **typed output table** (`ParsedRows`) that Powe
 - Clicking it opens the OS file picker filtered to `.csv` (hidden `<input type="file"
   accept=".csv,text/csv">`).
 - On selection, reads the file with `FileReader.readAsText(file, "UTF-8")` and parses it client-side.
-- Shows an inline summary under the button:
-  - `Rows parsed: N`
-  - `Total cost: <sum of total_cost, thousands-separated, 2 decimals>`
-  - `Error rows: M` (and, when `M > 0`, the offending 1-based row numbers)
-  - `No file selected` before any import; a clear message on structural problems
-    (e.g. `Missing column: total_cost`).
-- Exposes `ParsedRows` (typed table) plus convenience scalars, and raises `notifyOutputChanged()`
-  **once per import** so the app's `OnChange` fires exactly once.
+- Exposes `ParsedRows` (typed table) plus convenience scalars — `RowCount`, `TotalCostSum`,
+  `ErrorRowCount`, `ErrorRowNumbers`, and `ErrorMessage` (structural problems such as
+  `Missing column: total_cost`) — and raises `notifyOutputChanged()` **once per import** so the
+  app's `OnChange` fires exactly once.
 - Re-importing fully replaces the previous result; the file input is reset so selecting the **same
   filename** twice still triggers a parse.
 
-The component renders **only** the button + summary. Your app renders the rows in its own gallery.
+The component renders **only** the button, so it fits inline in a horizontal container. Your app
+renders the rows in its own gallery and surfaces the stats/errors via Power Fx (see `OnChange`
+examples below).
 
 ---
 
@@ -119,6 +117,8 @@ Convenience scalar outputs (so you can gate a commit button without recomputing)
 | `RowCount` | Whole Number | number of data rows parsed |
 | `ErrorRowCount` | Whole Number | number of error rows |
 | `TotalCostSum` | Decimal (number) | sum of `total_cost` across rows |
+| `ErrorMessage` | Text | structural parse/read error from the last import (e.g. `Missing column: total_cost`); empty on success |
+| `ErrorRowNumbers` | Text | comma-separated 1-based row numbers that failed numeric parsing (e.g. `"14, 27"`); empty when none |
 | `ParsedRowsJson` | Text | JSON of the rows — **fallback** only (see below) |
 
 ---
@@ -160,6 +160,26 @@ ClearCollect(colLineItems, Self.ParsedRows)
 
 Reference columns exactly as named — e.g. `ThisRecord.Description`, `ThisRecord.TotalCost`,
 `ThisRecord.StartDate` — in your gallery and downstream formulas.
+
+**Notify the user of the import result** (the control shows no inline summary — surface the
+stats yourself, typically at the start of the same `OnChange`):
+
+```powerfx
+If(
+    Self.ErrorMessage <> "",
+    Notify(Self.ErrorMessage, NotificationType.Error),
+    Self.ErrorRowCount > 0,
+    Notify(
+        $"Imported {Self.RowCount} rows — total {Text(Self.TotalCostSum, "#,##0.00")}. " &
+        $"{Self.ErrorRowCount} error row(s): {Self.ErrorRowNumbers}",
+        NotificationType.Warning
+    ),
+    Notify(
+        $"Imported {Self.RowCount} rows — total {Text(Self.TotalCostSum, "#,##0.00")}.",
+        NotificationType.Success
+    )
+)
+```
 
 **Gate your commit/save button** with the scalar outputs:
 
@@ -243,13 +263,14 @@ immediately, or rebuild with your own publisher via the steps above.
 ---
 
 ## Edge cases (all handled, no unhandled exceptions)
-- **Empty file** → `No data: the file is empty.`
-- **Header-only file** → `Rows parsed: 0 / Total cost: 0.00 / Error rows: 0`.
-- **Missing expected column(s)** → `Missing column: <names>` (lists every missing column).
+- **Empty file** → `ErrorMessage` = `No data: the file is empty.`
+- **Header-only file** → success with `RowCount` 0, `TotalCostSum` 0, `ErrorRowCount` 0.
+- **Missing expected column(s)** → `ErrorMessage` = `Missing column: <names>` (lists every missing
+  column).
 - **Short/long rows** → missing cells treated as empty (blank numeric → error row, amount 0); extra
   cells ignored. Columns are matched **by header name, not position**.
 - **Non-CSV file** → the picker is filtered to `.csv`; if forced, the header check surfaces a
-  `Missing column…` message; unreadable files → `Could not read file.`
+  `Missing column…` message; unreadable files → `ErrorMessage` = `Could not read file.`
 - **Re-import** fully replaces the previous result and fires `OnChange` again.
 - **Same filename twice** works (the file input value is cleared after each parse).
 
@@ -260,7 +281,7 @@ immediately, or rebuild with your own publisher via the steps above.
 endings, 22 data rows, exercising quoted embedded commas, a `""` escaped quote, space-padded
 thousands-separated amounts (incl. `952,816.96`), plain amounts, single/double-digit `M/D/YYYY`
 dates, two blank dates, and one non-numeric `unit_cost`. Parsing it yields:
-`Rows parsed: 22`, `Total cost: 1,153,607.24`, `Error rows: 1 (rows: 14)`.
+`RowCount` 22, `TotalCostSum` 1153607.24, `ErrorRowCount` 1, `ErrorRowNumbers` `"14"`.
 Because columns are matched by header name, **your real export drops into the same folder and works
 regardless of column order.**
 

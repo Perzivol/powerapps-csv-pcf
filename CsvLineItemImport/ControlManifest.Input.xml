@@ -2,7 +2,7 @@
 <manifest>
   <control namespace="CsvTools"
            constructor="CsvLineItemImport"
-           version="1.0.0"
+           version="1.1.0"
            display-name-key="CSV Line-Item Import"
            description-key="Pick a local .csv, parse it client-side, and expose the rows to the canvas app as a typed table."
            control-type="standard">
@@ -59,6 +59,18 @@
               display-name-key="Total Cost Sum"
               description-key="Sum of the total_cost column across all parsed rows."
               of-type="Decimal"
+              usage="output" />
+
+    <property name="ErrorMessage"
+              display-name-key="Error Message"
+              description-key="Parse/read error message from the last import attempt; empty on success."
+              of-type="SingleLine.Text"
+              usage="output" />
+
+    <property name="ErrorRowNumbers"
+              display-name-key="Error Row Numbers"
+              description-key="Comma-separated 1-based row numbers that failed numeric parsing; empty when none."
+              of-type="SingleLine.Text"
               usage="output" />
 
     <!-- ===================== DOCUMENTED FALLBACK OUTPUT ===================== -->
