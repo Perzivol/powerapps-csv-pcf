@@ -10,7 +10,6 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
     private _root!: HTMLDivElement;
     private _button!: HTMLButtonElement;
     private _fileInput!: HTMLInputElement;
-    private _summary!: HTMLDivElement;
 
     private _buttonText = DEFAULT_BUTTON_TEXT;
 
@@ -19,6 +18,8 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
     private _rowCount = 0;
     private _errorRowCount = 0;
     private _totalCostSum = 0;
+    private _errorMessage = "";
+    private _errorRowNumbers = "";
 
     constructor() {
         // Empty
@@ -50,13 +51,8 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
         this._fileInput.style.display = "none";
         this._fileInput.addEventListener("change", this.onFileChange);
 
-        this._summary = document.createElement("div");
-        this._summary.className = "csv-summary";
-        this._summary.textContent = "No file selected";
-
         this._root.appendChild(this._button);
         this._root.appendChild(this._fileInput);
-        this._root.appendChild(this._summary);
         this._container.appendChild(this._root);
     }
 
@@ -110,15 +106,16 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
 
     private applyResult(result: ParseResult): void {
         if (result.error) {
-            // Structural problem (empty / missing column): clear data and show the message.
+            // Structural problem (empty / missing column): clear data and surface the message.
             this.resetOutputs();
-            this.renderError(result.error);
+            this._errorMessage = result.error;
         } else {
             this._rows = result.rows;
             this._rowCount = result.rowCount;
             this._errorRowCount = result.errorRowCount;
             this._totalCostSum = result.totalCostSum;
-            this.renderSummary(result);
+            this._errorMessage = "";
+            this._errorRowNumbers = result.errorRowNumbers.join(", ");
         }
         // Fire OnChange exactly once per import (success OR handled error).
         this._notifyOutputChanged();
@@ -126,7 +123,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
 
     private applyError(message: string): void {
         this.resetOutputs();
-        this.renderError(message);
+        this._errorMessage = message;
         this._notifyOutputChanged();
     }
 
@@ -135,31 +132,8 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
         this._rowCount = 0;
         this._errorRowCount = 0;
         this._totalCostSum = 0;
-    }
-
-    private renderSummary(result: ParseResult): void {
-        const money = new Intl.NumberFormat("en-US", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(result.totalCostSum);
-
-        const errorLine =
-            result.errorRowCount > 0
-                ? `Error rows: ${result.errorRowCount} (rows: ${result.errorRowNumbers.join(", ")})`
-                : "Error rows: 0";
-
-        this._summary.className = "csv-summary";
-        this._summary.textContent = "";
-        for (const line of [`Rows parsed: ${result.rowCount}`, `Total cost: ${money}`, errorLine]) {
-            const div = document.createElement("div");
-            div.textContent = line;
-            this._summary.appendChild(div);
-        }
-    }
-
-    private renderError(message: string): void {
-        this._summary.className = "csv-summary csv-summary--error";
-        this._summary.textContent = message;
+        this._errorMessage = "";
+        this._errorRowNumbers = "";
     }
 
     /**
@@ -198,6 +172,8 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
             RowCount: this._rowCount,
             ErrorRowCount: this._errorRowCount,
             TotalCostSum: this._totalCostSum,
+            ErrorMessage: this._errorMessage,
+            ErrorRowNumbers: this._errorRowNumbers,
             ParsedRowsJson: JSON.stringify(this._rows),
         };
     }

@@ -31,15 +31,3 @@
     outline: 1px solid #605e5c;
     outline-offset: 1px;
 }
-
-.csv-summary {
-    margin-top: 8px;
-    line-height: 1.5;
-    color: #605e5c;
-    white-space: normal;
-    overflow-wrap: anywhere;
-}
-
-.csv-summary--error {
-    color: #a4262c;
-}
