@@ -12,5 +12,11 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["test/csvParser.selftest.ts", "CsvLineItemImport/csvParser.ts"]
+  "include": [
+    "test/xlsxImport.selftest.ts",
+    "test/xlsxFixture.ts",
+    "scripts/make-sample-xlsx.ts",
+    "CsvLineItemImport/lineItemParser.ts",
+    "CsvLineItemImport/xlsxReader.ts"
+  ]
 }

@@ -1,7 +1,8 @@
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
-import { parseCsv, ParsedRow, ParseResult } from "./csvParser";
+import { parseWorkbookGrid, ParsedRow, ParseResult } from "./lineItemParser";
+import { readXlsxGrid } from "./xlsxReader";
 
-const DEFAULT_BUTTON_TEXT = "Import CSV";
+const DEFAULT_BUTTON_TEXT = "Import Excel";
 
 export class CsvLineItemImport implements ComponentFramework.StandardControl<IInputs, IOutputs> {
     private _container!: HTMLDivElement;
@@ -17,7 +18,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
     private _rows: ParsedRow[] = [];
     private _rowCount = 0;
     private _errorRowCount = 0;
-    private _totalCostSum = 0;
+    private _amountSum = 0;
     private _errorMessage = "";
     private _errorRowNumbers = "";
 
@@ -44,10 +45,10 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
         this._button.textContent = this._buttonText;
         this._button.addEventListener("click", this.onButtonClick);
 
-        // Hidden native file picker, filtered to CSV.
+        // Hidden native file picker, filtered to Excel workbooks.
         this._fileInput = document.createElement("input");
         this._fileInput.type = "file";
-        this._fileInput.accept = ".csv,text/csv";
+        this._fileInput.accept = ".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
         this._fileInput.style.display = "none";
         this._fileInput.addEventListener("change", this.onFileChange);
 
@@ -86,8 +87,13 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
 
         const reader = new FileReader();
         reader.onload = (): void => {
-            const text = typeof reader.result === "string" ? reader.result : "";
-            this.applyResult(parseCsv(text));
+            const buf = reader.result instanceof ArrayBuffer ? reader.result : new ArrayBuffer(0);
+            const workbook = readXlsxGrid(buf);
+            if (workbook.error) {
+                this.applyError(workbook.error);
+            } else {
+                this.applyResult(parseWorkbookGrid(workbook.grid, { date1904: workbook.date1904 }));
+            }
             // Clear the value so picking the SAME filename again re-fires "change".
             this._fileInput.value = "";
         };
@@ -97,7 +103,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
         };
 
         try {
-            reader.readAsText(file, "UTF-8");
+            reader.readAsArrayBuffer(file);
         } catch {
             this.applyError("Could not read file.");
             this._fileInput.value = "";
@@ -113,7 +119,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
             this._rows = result.rows;
             this._rowCount = result.rowCount;
             this._errorRowCount = result.errorRowCount;
-            this._totalCostSum = result.totalCostSum;
+            this._amountSum = result.amountSum;
             this._errorMessage = "";
             this._errorRowNumbers = result.errorRowNumbers.join(", ");
         }
@@ -131,7 +137,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
         this._rows = [];
         this._rowCount = 0;
         this._errorRowCount = 0;
-        this._totalCostSum = 0;
+        this._amountSum = 0;
         this._errorMessage = "";
         this._errorRowNumbers = "";
     }
@@ -149,15 +155,14 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
                 items: {
                     type: "object",
                     properties: {
-                        ProductCode: { type: "string" },
                         Description: { type: "string" },
-                        UnitCost: { type: "number" },
-                        Quantity: { type: "number" },
+                        ProjectNumber: { type: "string" },
+                        GLAccount: { type: "string" },
+                        Amount: { type: "number" },
+                        BusinessGroup: { type: "string" },
+                        Budgeted: { type: "boolean" },
                         StartDate: { type: "string" },
                         EndDate: { type: "string" },
-                        TotalCost: { type: "number" },
-                        SourceDocument: { type: "string" },
-                        SourcePage: { type: "string" },
                         RowNumber: { type: "integer" },
                         HasError: { type: "boolean" },
                     },
@@ -171,7 +176,7 @@ export class CsvLineItemImport implements ComponentFramework.StandardControl<IIn
             ParsedRows: this._rows,
             RowCount: this._rowCount,
             ErrorRowCount: this._errorRowCount,
-            TotalCostSum: this._totalCostSum,
+            AmountSum: this._amountSum,
             ErrorMessage: this._errorMessage,
             ErrorRowNumbers: this._errorRowNumbers,
             ParsedRowsJson: JSON.stringify(this._rows),

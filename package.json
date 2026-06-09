@@ -1,7 +1,7 @@
 {
   "name": "csv-line-item-import",
-  "version": "1.0.0",
-  "description": "PCF code component: pick a local .csv, parse it client-side, and expose the rows to a canvas app as a typed table.",
+  "version": "2.0.0",
+  "description": "PCF code component: pick a local .xlsx, parse it client-side, and expose the rows to a canvas app as a typed table.",
   "scripts": {
     "build": "pcf-scripts build",
     "clean": "pcf-scripts clean",
@@ -11,9 +11,11 @@
     "start": "pcf-scripts start",
     "start:watch": "pcf-scripts start watch",
     "refreshTypes": "pcf-scripts refreshTypes",
-    "selftest": "tsc -p tsconfig.selftest.json && node obj/selftest/test/csvParser.selftest.js"
+    "selftest": "tsc -p tsconfig.selftest.json && node obj/selftest/test/xlsxImport.selftest.js",
+    "make-sample": "tsc -p tsconfig.selftest.json && node obj/selftest/scripts/make-sample-xlsx.js"
   },
   "dependencies": {
+    "fflate": "0.8.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.1",

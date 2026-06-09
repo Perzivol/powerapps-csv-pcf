@@ -1,18 +1,19 @@
-# CSV Line-Item Import — Power Apps PCF Code Component
+# Excel Line-Item Import — Power Apps PCF Code Component
 
 A standard (non-React) Power Apps Component Framework control for **canvas apps**. It renders an
-**Import CSV** button, lets the user pick a local `.csv`, parses it **entirely in the browser**
-(no network, no Power Automate, no Dataverse), and exposes the parsed rows back to the app as a
-**typed output table** (`ParsedRows`) that Power Fx can `ForAll`/`Collect` directly — **no
-`ParseJSON` required**. Parse stats and error details are exposed as scalar outputs so the app
-can surface them with Power Fx (e.g. `Notify()` in `OnChange`).
+**Import Excel** button, lets the user pick a local `.xlsx`, parses the **first worksheet entirely
+in the browser** (no network, no Power Automate, no Dataverse), and exposes the parsed rows back
+to the app as a **typed output table** (`ParsedRows`) that Power Fx can `ForAll`/`Collect`
+directly — **no `ParseJSON` required**. Parse stats and error details are exposed as scalar
+outputs so the app can surface them with Power Fx (e.g. `Notify()` in `OnChange`).
 
 ---
 
 ## Assumptions (read me first)
 
 1. **Control model: standard (non-virtual), vanilla TypeScript + DOM.** The UI is one button and a
-   hidden `<input type="file">` — no React. Smallest possible bundle (~18 KB), zero UI dependencies.
+   hidden `<input type="file">` — no React. Small bundle (~110 KB incl. the unzip library), zero
+   UI dependencies.
 2. **Typed-table output mechanism: an object-typed output property + `getOutputSchema()`.**
    `ParsedRows` is declared `of-type="Object"` with a hidden dependent `ParsedRowsSchema`
    property linked through `<property-dependencies … required-for="schema">`.
@@ -24,25 +25,31 @@ can surface them with Power Fx (e.g. `Notify()` in `OnChange`).
    is only `string | integer | number | boolean | object | array` — there is **no date type** — so
    `StartDate`/`EndDate` cannot be a native `DateAndTime` column *inside an object output*. They are
    emitted as ISO `yyyy-mm-dd` strings (blank/unparseable → `""`). The Power Fx binding below shows
-   the one-line `DateValue()` conversion. (Section 3 of the build spec explicitly permits ISO text.)
-4. **Parser: a hand-rolled RFC-4180 state machine** (`CsvLineItemImport/csvParser.ts`) with **zero
-   runtime dependencies**. It handles UTF-8 BOM, CRLF/bare-LF, quoted fields with embedded commas,
-   and `""` escaped quotes.
+   the one-line `DateValue()` conversion.
+4. **Workbook reader: a minimal purpose-built OOXML scanner** (`CsvLineItemImport/xlsxReader.ts`)
+   with [`fflate`](https://www.npmjs.com/package/fflate) used for unzipping only. It reads the
+   **first worksheet** of the workbook, handles shared strings (incl. rich-text runs), inline
+   strings, formula result caches, boolean/error cells, and sparse rows. `styles.xml` is **not**
+   parsed: the Start/End Date columns are identified **by header name**, and their cells are
+   interpreted as Excel date serial numbers (1900 and 1904 date systems) or `M/D/YYYY` text —
+   whichever the cell contains.
 5. **Naming placeholders** (`namespace CsvTools`, publisher prefix `eda`, solution
    `Utilities_CsvLineItemImport`) should be replaced with your organization's conventions before
-   packaging.
+   packaging. Note: the `CsvTools.CsvLineItemImport` technical name is intentionally **kept from
+   v1** so Dataverse upgrades the existing component instead of creating a new one.
 
 ---
 
 ## What it does
 
-- Renders a primary button labeled from the **`ButtonText`** input (default `Import CSV`).
-- Clicking it opens the OS file picker filtered to `.csv` (hidden `<input type="file"
-  accept=".csv,text/csv">`).
-- On selection, reads the file with `FileReader.readAsText(file, "UTF-8")` and parses it client-side.
-- Exposes `ParsedRows` (typed table) plus convenience scalars — `RowCount`, `TotalCostSum`,
+- Renders a primary button labeled from the **`ButtonText`** input (default `Import Excel`).
+- Clicking it opens the OS file picker filtered to `.xlsx` (hidden `<input type="file"
+  accept=".xlsx,…">`).
+- On selection, reads the file with `FileReader.readAsArrayBuffer`, unzips it, and parses the
+  first worksheet client-side.
+- Exposes `ParsedRows` (typed table) plus convenience scalars — `RowCount`, `AmountSum`,
   `ErrorRowCount`, `ErrorRowNumbers`, and `ErrorMessage` (structural problems such as
-  `Missing column: total_cost`) — and raises `notifyOutputChanged()` **once per import** so the
+  `Missing column: Amount`) — and raises `notifyOutputChanged()` **once per import** so the
   app's `OnChange` fires exactly once.
 - Re-importing fully replaces the previous result; the file input is reset so selecting the **same
   filename** twice still triggers a parse.
@@ -60,11 +67,14 @@ examples below).
 ├─ CsvLineItemImport/
 │  ├─ ControlManifest.Input.xml     # properties incl. ParsedRows object output + schema dependency
 │  ├─ index.ts                      # standard control: UI, FileReader, getOutputSchema, getOutputs
-│  ├─ csvParser.ts                  # pure RFC-4180 parser + normalizers (no deps, unit-tested)
+│  ├─ xlsxReader.ts                 # .xlsx -> raw cell grid (fflate unzip + OOXML scanning, no DOM)
+│  ├─ lineItemParser.ts             # pure grid -> typed-row mapper + normalizers (unit-tested)
 │  ├─ css/CsvLineItemImport.css     # minimal neutral styling
 │  └─ generated/ManifestTypes.d.ts  # generated by `npm run build` / `npm run refreshTypes`
-├─ test/csvParser.selftest.ts       # standalone parser self-test (npm run selftest)
-├─ sample-data/sample-lineitems.csv # canonical fixture: BOM + CRLF + every quirk, 22 rows
+├─ test/xlsxImport.selftest.ts      # standalone parser/reader self-test (npm run selftest)
+├─ test/xlsxFixture.ts              # in-memory .xlsx builder shared by test + sample script
+├─ scripts/make-sample-xlsx.ts      # regenerates sample-data/sample-lineitems.xlsx (npm run make-sample)
+├─ sample-data/sample-lineitems.xlsx# canonical fixture: 20 rows, every supported quirk
 ├─ tsconfig.json · tsconfig.selftest.json · pcfconfig.json · eslint.config.mjs · package.json
 └─ "Power Apps CSV.pcfproj"         # MSBuild project used when packaging into a solution
 ```
@@ -76,7 +86,8 @@ examples below).
 ```powershell
 npm install
 npm run build       # validates manifest, type-checks, bundles -> out/controls/CsvLineItemImport
-npm run selftest    # runs the RFC-4180 / normalizer assertions (exits non-zero on failure)
+npm run selftest    # runs the OOXML-reader / normalizer assertions (exits non-zero on failure)
+npm run make-sample # regenerates sample-data/sample-lineitems.xlsx
 npm start watch     # optional: local test harness (renders the button + file picker)
 ```
 
@@ -86,6 +97,17 @@ npm start watch     # optional: local test harness (renders the button + file pi
 
 ---
 
+## Input contract
+
+The **first worksheet** must contain a header row with these columns (matched **by header name,
+not position**; case-insensitive, extra columns ignored, surrounding/internal whitespace
+normalized):
+
+`Line Description` · `Project #` · `GL Account Description` · `Amount` · `Business Group` ·
+`Budgeted` · `Start Date` · `End Date`
+
+Leading blank rows above the header and fully blank rows between data rows are skipped.
+
 ## Output contract
 
 `ParsedRows` is a Power Fx **Table**; each record has these columns (names/casing are stable —
@@ -93,22 +115,21 @@ reference them exactly):
 
 | Column | Power Fx type | Source / rule |
 |---|---|---|
-| `ProductCode` | Text | `product_code`, trimmed |
-| `Description` | Text | `product_description`, trimmed |
-| `UnitCost` | Number | normalized `unit_cost` |
-| `Quantity` | Number | normalized `quantity` |
-| `StartDate` | Text (ISO `yyyy-mm-dd`) | parsed `coverage_start_date`; `""` if blank |
-| `EndDate` | Text (ISO `yyyy-mm-dd`) | parsed `coverage_end_date`; `""` if blank |
-| `TotalCost` | Number | normalized `total_cost` |
-| `SourceDocument` | Text | `source_document`, trimmed |
-| `SourcePage` | Text | `source_page`, trimmed |
+| `Description` | Text | `Line Description`, trimmed |
+| `ProjectNumber` | Text | `Project #`, trimmed |
+| `GLAccount` | Text | `GL Account Description`, trimmed + internal whitespace collapsed — matches Dataverse choice **labels** like `80-01-009 - Software Maintenance` |
+| `Amount` | Number | normalized, rounded to 2 decimals; on parse failure → `0` and `HasError` true |
+| `BusinessGroup` | Text | `Business Group`, trimmed |
+| `Budgeted` | Boolean | `yes` / `true` / `1` (case-insensitive) → `true`; anything else → `false` |
+| `StartDate` | Text (ISO `yyyy-mm-dd`) | Excel date serial **or** `M/D/YYYY` text; `""` if blank/unparseable |
+| `EndDate` | Text (ISO `yyyy-mm-dd`) | same rule as `StartDate` |
 | `RowNumber` | Number | 1-based index within the parsed data rows |
-| `HasError` | Boolean | true if any numeric field failed to parse |
+| `HasError` | Boolean | true if `Amount` failed to parse |
 
-**Numeric normalization:** trim → remove thousands separators (`,`) → `parseFloat`. On `NaN`, the
-amount is set to `0` and the row's `HasError` is `true`.
-**Error rows** are rows where `unit_cost`, `quantity`, or `total_cost` failed to parse. A blank or
-unparseable **date** does **not**, by itself, mark a row as an error.
+**Numeric normalization:** trim → remove thousands separators (`,`) → `parseFloat` → round to
+2 decimals (also strips Excel binary-float artifacts like `3420.0000000001`).
+**Error rows** are rows where `Amount` failed to parse. A blank or unparseable **date** does
+**not**, by itself, mark a row as an error.
 
 Convenience scalar outputs (so you can gate a commit button without recomputing):
 
@@ -116,10 +137,13 @@ Convenience scalar outputs (so you can gate a commit button without recomputing)
 |---|---|---|
 | `RowCount` | Whole Number | number of data rows parsed |
 | `ErrorRowCount` | Whole Number | number of error rows |
-| `TotalCostSum` | Decimal (number) | sum of `total_cost` across rows |
-| `ErrorMessage` | Text | structural parse/read error from the last import (e.g. `Missing column: total_cost`); empty on success |
-| `ErrorRowNumbers` | Text | comma-separated 1-based row numbers that failed numeric parsing (e.g. `"14, 27"`); empty when none |
+| `AmountSum` | Decimal (number) | sum of `Amount` across rows (2-decimal rounded) |
+| `ErrorMessage` | Text | structural parse/read error from the last import (e.g. `Missing column: Amount`); empty on success |
+| `ErrorRowNumbers` | Text | comma-separated 1-based row numbers whose Amount failed to parse (e.g. `"14, 27"`); empty when none |
 | `ParsedRowsJson` | Text | JSON of the rows — **fallback** only (see below) |
+
+> **Upgrading from v1 (CSV):** the table columns changed entirely and `TotalCostSum` was renamed
+> to `AmountSum` — update your `OnChange` / gating formulas after upgrading the component.
 
 ---
 
@@ -128,7 +152,9 @@ Convenience scalar outputs (so you can gate a commit button without recomputing)
 Put this on the component's **`OnChange`** (inside the control's own `OnChange`, use `Self`;
 from another control, use the component's name, e.g. `CsvLineItemImport1`).
 
-**Recommended** — converts the ISO date text to real dates and guards blanks:
+**Recommended** — converts dates, and maps the GL Account text to the **Dataverse choice** so a
+gallery dropdown can be pre-selected (replace `'Line Items'` with your table and `'GL Account'`
+with your choice column):
 
 ```powerfx
 ClearCollect(
@@ -136,30 +162,35 @@ ClearCollect(
     ForAll(
         Self.ParsedRows As Row,
         {
-            ProductCode:    Row.ProductCode,
-            Description:    Row.Description,
-            UnitCost:       Row.UnitCost,
-            Quantity:       Row.Quantity,
-            StartDate:      If(IsBlank(Row.StartDate), Blank(), DateValue(Row.StartDate)),
-            EndDate:        If(IsBlank(Row.EndDate),   Blank(), DateValue(Row.EndDate)),
-            TotalCost:      Row.TotalCost,
-            SourceDocument: Row.SourceDocument,
-            SourcePage:     Row.SourcePage,
-            RowNumber:      Row.RowNumber,
-            HasError:       Row.HasError
+            Description:   Row.Description,
+            ProjectNumber: Row.ProjectNumber,
+            GLAccount:     LookUp(
+                               Choices('Line Items'.'GL Account'),
+                               Text(Value) = Row.GLAccount
+                           ),
+            GLAccountText: Row.GLAccount,
+            Amount:        Row.Amount,
+            BusinessGroup: Row.BusinessGroup,
+            Budgeted:      Row.Budgeted,
+            StartDate:     If(IsBlank(Row.StartDate), Blank(), DateValue(Row.StartDate)),
+            EndDate:       If(IsBlank(Row.EndDate),   Blank(), DateValue(Row.EndDate)),
+            RowNumber:     Row.RowNumber,
+            HasError:      Row.HasError
         }
     )
 )
 ```
 
-**Simplest** — collect the typed table as-is (dates stay as text):
+The `LookUp` works because the strings in the Excel file are exactly the choice **labels**
+defined on the Dataverse column. If a row's text doesn't match any label, `GLAccount` comes
+through as `Blank()` — keep the raw `GLAccountText` column so the user can see what the file
+said and pick the right choice manually.
 
-```powerfx
-ClearCollect(colLineItems, Self.ParsedRows)
-```
+**Gallery dropdown** (inside the gallery, synced with the Dataverse choices):
 
-Reference columns exactly as named — e.g. `ThisRecord.Description`, `ThisRecord.TotalCost`,
-`ThisRecord.StartDate` — in your gallery and downstream formulas.
+- `Items`: `Choices('Line Items'.'GL Account')`
+- Classic dropdown `Default`: `ThisItem.GLAccount` — or modern/combo box
+  `DefaultSelectedItems`: `[ThisItem.GLAccount]`
 
 **Notify the user of the import result** (the control shows no inline summary — surface the
 stats yourself, typically at the start of the same `OnChange`):
@@ -170,12 +201,12 @@ If(
     Notify(Self.ErrorMessage, NotificationType.Error),
     Self.ErrorRowCount > 0,
     Notify(
-        $"Imported {Self.RowCount} rows — total {Text(Self.TotalCostSum, "#,##0.00")}. " &
+        $"Imported {Self.RowCount} rows — total {Text(Self.AmountSum, "#,##0.00")}. " &
         $"{Self.ErrorRowCount} error row(s): {Self.ErrorRowNumbers}",
         NotificationType.Warning
     ),
     Notify(
-        $"Imported {Self.RowCount} rows — total {Text(Self.TotalCostSum, "#,##0.00")}.",
+        $"Imported {Self.RowCount} rows — total {Text(Self.AmountSum, "#,##0.00")}.",
         NotificationType.Success
     )
 )
@@ -197,17 +228,16 @@ ClearCollect(
     ForAll(
         Table(ParseJSON(CsvLineItemImport1.ParsedRowsJson)) As Row,
         {
-            ProductCode:    Text(Row.Value.ProductCode),
-            Description:    Text(Row.Value.Description),
-            UnitCost:       Value(Row.Value.UnitCost),
-            Quantity:       Value(Row.Value.Quantity),
-            StartDate:      If(IsBlank(Text(Row.Value.StartDate)), Blank(), DateValue(Text(Row.Value.StartDate))),
-            EndDate:        If(IsBlank(Text(Row.Value.EndDate)),   Blank(), DateValue(Text(Row.Value.EndDate))),
-            TotalCost:      Value(Row.Value.TotalCost),
-            SourceDocument: Text(Row.Value.SourceDocument),
-            SourcePage:     Text(Row.Value.SourcePage),
-            RowNumber:      Value(Row.Value.RowNumber),
-            HasError:       Boolean(Row.Value.HasError)
+            Description:   Text(Row.Value.Description),
+            ProjectNumber: Text(Row.Value.ProjectNumber),
+            GLAccountText: Text(Row.Value.GLAccount),
+            Amount:        Value(Row.Value.Amount),
+            BusinessGroup: Text(Row.Value.BusinessGroup),
+            Budgeted:      Boolean(Row.Value.Budgeted),
+            StartDate:     If(IsBlank(Text(Row.Value.StartDate)), Blank(), DateValue(Text(Row.Value.StartDate))),
+            EndDate:       If(IsBlank(Text(Row.Value.EndDate)),   Blank(), DateValue(Text(Row.Value.EndDate))),
+            RowNumber:     Value(Row.Value.RowNumber),
+            HasError:      Boolean(Row.Value.HasError)
         }
     )
 )
@@ -233,7 +263,9 @@ ClearCollect(
 pac auth create --environment https://<your-env>.crm.dynamics.com
 pac pcf push --publisher-prefix eda
 ```
-Then in the app: **Insert → Get more components → Code → import `CSV Line-Item Import`**.
+Then in the app: **Insert → Get more components → Code → import `Excel Line-Item Import`**.
+If the v1 (CSV) component is already in the app, use **Update code components** so the app picks
+up version 2.0.0, then update your formulas (new columns; `TotalCostSum` → `AmountSum`).
 
 ### Option B — packaged solution (recommended for ALM / pipelines)
 ```powershell
@@ -249,41 +281,42 @@ pac solution import --path .\bin\Release\<Solution>.zip
 ```
 Then add the control to your app as in Option A.
 
-**Prebuilt sample artifacts:** ready-to-import zips are already in [`dist/`](dist) —
-`UtilitiesCsvLineItemImport_managed.zip` and `UtilitiesCsvLineItemImport_unmanaged.zip`
-(publisher prefix `eda`, control `eda_CsvTools.CsvLineItemImport`). Use them to try the component
-immediately, or rebuild with your own publisher via the steps above.
+> **Note:** the prebuilt zips in [`dist/`](dist) are from **v1 (CSV import)** and are stale —
+> rebuild via Option A/B to deploy v2.
 
 ### Using the component
 1. Place the control on a screen; set **`ButtonText`** if desired.
-2. Add the **`OnChange`** formula above (typically `ClearCollect(colLineItems, …)`).
-3. Bind a gallery to `colLineItems`; map fields into your own collection/data source as needed.
+2. Add the **`OnChange`** formula above (typically `Notify(...)` + `ClearCollect(colLineItems, …)`).
+3. Bind a gallery to `colLineItems`; the GL Account dropdown maps via the choice `LookUp` shown above.
 4. Gate your commit button with `… .ErrorRowCount = 0 && … .RowCount > 0`.
 
 ---
 
 ## Edge cases (all handled, no unhandled exceptions)
-- **Empty file** → `ErrorMessage` = `No data: the file is empty.`
-- **Header-only file** → success with `RowCount` 0, `TotalCostSum` 0, `ErrorRowCount` 0.
+- **Empty workbook / empty sheet** → `ErrorMessage` = `No data: the file is empty.`
+- **Header-only sheet** → success with `RowCount` 0, `AmountSum` 0, `ErrorRowCount` 0.
 - **Missing expected column(s)** → `ErrorMessage` = `Missing column: <names>` (lists every missing
-  column).
-- **Short/long rows** → missing cells treated as empty (blank numeric → error row, amount 0); extra
-  cells ignored. Columns are matched **by header name, not position**.
-- **Non-CSV file** → the picker is filtered to `.csv`; if forced, the header check surfaces a
-  `Missing column…` message; unreadable files → `ErrorMessage` = `Could not read file.`
+  column by its display name).
+- **Blank rows** (above the header or between data rows) → skipped; row numbering stays contiguous.
+- **Sparse rows** (Excel omits empty cells) → missing cells treated as empty; a blank `Amount` →
+  error row, amount 0. Extra columns ignored; columns are matched **by header name, not position**.
+- **Dates** → native Excel date cells (serial numbers, 1900 or 1904 date system) and `M/D/YYYY`
+  text both convert to ISO; blank/unparseable → `""` (not an error).
+- **Amounts stored as text** (e.g. `"952,816.96"`) → thousands separators stripped and parsed.
+- **Non-xlsx / corrupt file** → `ErrorMessage` = `Could not read file: not a valid .xlsx workbook.`
+- **Multiple worksheets** → only the **first** tab is read.
 - **Re-import** fully replaces the previous result and fires `OnChange` again.
 - **Same filename twice** works (the file input value is cleared after each parse).
 
 ---
 
 ## Sample data
-`sample-data/sample-lineitems.csv` is the canonical fixture — written with a real UTF-8 BOM and CRLF
-endings, 22 data rows, exercising quoted embedded commas, a `""` escaped quote, space-padded
-thousands-separated amounts (incl. `952,816.96`), plain amounts, single/double-digit `M/D/YYYY`
-dates, two blank dates, and one non-numeric `unit_cost`. Parsing it yields:
-`RowCount` 22, `TotalCostSum` 1153607.24, `ErrorRowCount` 1, `ErrorRowNumbers` `"14"`.
-Because columns are matched by header name, **your real export drops into the same folder and works
-regardless of column order.**
+`sample-data/sample-lineitems.xlsx` is the canonical fixture (regenerate with
+`npm run make-sample`): 20 data rows exercising native serial dates, `M/D/YYYY` text dates, blank
+dates, thousands-separated text amounts, a mid-sheet blank row, and one non-numeric `Amount`
+(`TBD`). Parsing it yields: `RowCount` 20, `AmountSum` 1,034,893.50, `ErrorRowCount` 1,
+`ErrorRowNumbers` `"14"`. Because columns are matched by header name, **your real export drops
+into the same folder and works regardless of column order.**
 
 ---
 
@@ -293,4 +326,3 @@ regardless of column order.**
 - Suggested naming (replace with your org's): solution `Utilities_CsvLineItemImport`
   (`{Department}_{AppName}`), publisher prefix per convention. Ship through Power Platform Pipelines
   (Dev → Test → Prod) like any other solution.
-```
