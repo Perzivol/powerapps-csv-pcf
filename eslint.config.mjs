@@ -7,7 +7,7 @@ import typescriptEslint from "typescript-eslint";
 /** @type {import('eslint').Linter.Config[]} */
 export default [
   {
-    ignores: ["**/generated/", "out/", "obj/", "bin/", "test/", "**/*.selftest.ts"],
+    ignores: ["**/generated/", "out/", "obj/", "bin/", "test/", "scripts/", "**/*.selftest.ts"],
   },
   eslintjs.configs.recommended,
   ...typescriptEslint.configs.recommended,

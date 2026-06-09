@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
+  <!-- Namespace/constructor are intentionally unchanged from v1 ("Csv" naming) so Dataverse
+       treats this as an upgrade of the existing component rather than a new one. -->
   <control namespace="CsvTools"
            constructor="CsvLineItemImport"
-           version="1.1.0"
-           display-name-key="CSV Line-Item Import"
-           description-key="Pick a local .csv, parse it client-side, and expose the rows to the canvas app as a typed table."
+           version="2.0.0"
+           display-name-key="Excel Line-Item Import"
+           description-key="Pick a local .xlsx, parse the first worksheet client-side, and expose the rows to the canvas app as a typed table."
            control-type="standard">
 
     <!-- This control makes NO network/external calls (pure client-side FileReader parsing).
@@ -19,7 +21,7 @@
               of-type="SingleLine.Text"
               usage="input"
               required="false"
-              default-value="Import CSV" />
+              default-value="Import Excel" />
 
     <!-- ===================== PRIMARY TYPED-TABLE OUTPUT ===================== -->
     <!-- ParsedRows is an object-typed output. getOutputSchema() in index.ts returns a
@@ -27,7 +29,7 @@
          typed Table (no ParseJSON required). -->
     <property name="ParsedRows"
               display-name-key="Parsed Rows"
-              description-key="Parsed CSV rows exposed as a typed table."
+              description-key="Parsed Excel rows exposed as a typed table."
               of-type="Object"
               usage="output"
               hidden="false"
@@ -51,13 +53,13 @@
 
     <property name="ErrorRowCount"
               display-name-key="Error Row Count"
-              description-key="Number of rows that failed numeric parsing."
+              description-key="Number of rows whose Amount failed to parse."
               of-type="Whole.None"
               usage="output" />
 
-    <property name="TotalCostSum"
-              display-name-key="Total Cost Sum"
-              description-key="Sum of the total_cost column across all parsed rows."
+    <property name="AmountSum"
+              display-name-key="Amount Sum"
+              description-key="Sum of the Amount column across all parsed rows."
               of-type="Decimal"
               usage="output" />
 
@@ -69,7 +71,7 @@
 
     <property name="ErrorRowNumbers"
               display-name-key="Error Row Numbers"
-              description-key="Comma-separated 1-based row numbers that failed numeric parsing; empty when none."
+              description-key="Comma-separated 1-based row numbers whose Amount failed to parse; empty when none."
               of-type="SingleLine.Text"
               usage="output" />
 
